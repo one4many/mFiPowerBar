@@ -77,6 +77,9 @@ def main(device=None, action=None):
     else:
         print("All Off| color=green")
     print("---")
+    for device in mFi.getDeviceList():
+        if device.getStatus() != 'OK':
+            print("Device %s: %s| color=red" %(device.getName(), device.getStatus()))
     for (device, socket) in sockets_on:
         text = ":full_moon: {1} @ {0} is using {2:.2f} W (ON)".format(device.getName(), socket, device.getSocketData(socket)['power'])
         data = {

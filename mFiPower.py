@@ -11,7 +11,7 @@ def gGET(url, cookie, allow_redirects = True):
     cookies = {}
     if cookie:
         cookies['AIROS_SESSIONID'] = '%s' %(cookie)
-    r = requests.get(url, cookies=cookies, allow_redirects=allow_redirects)
+    r = requests.get(url, cookies=cookies, allow_redirects=allow_redirects, timeout=5)
     if r.status_code == 200:
         return r.json()
     return None
@@ -22,7 +22,7 @@ def gPUT(url, payload, cookie=None, json=True):
     headers['content-type'] = 'application/x-www-form-urlencoded'
     if cookie:
         cookies['AIROS_SESSIONID'] = '%s' %(cookie)
-    r = requests.put(url, data=payload, headers=headers, cookies=cookies)
+    r = requests.put(url, data=payload, headers=headers, cookies=cookies, timeout=5)
     if r.status_code == 200:
         if json:
             return r.json()
@@ -36,7 +36,7 @@ def gPOST(url, payload, cookie=None, json=True, debug=False):
     headers['content-type'] = 'application/x-www-form-urlencoded'
     if cookie:
         cookies['AIROS_SESSIONID'] = '%s' %(cookie)
-    r = requests.post(url, data=payload, headers=headers, cookies=cookies)
+    r = requests.post(url, data=payload, headers=headers, cookies=cookies, timeout=5)
     if debug:
         print '----- DEBUG: %s %s ----' %(url,payload)
         print 'status code:', r.status_code
@@ -59,13 +59,28 @@ class mFiPowerDevice:
         self.sensors = {}
         self.sockets = {}
         self.lastUpdate = float(0)
+        self.status = 'n/a'
         self.update(force = True)
+
+    def getStatus(self):
+        return self.status
 
     def login(self):
         c = randint(10**31, (10**32)-1)
-        r = gPOST('%s/login.cgi' %(self.url), 'username=%s&password=%s' %(self.user, self.passwd), c, json=False, debug=False)
+        try:
+            r = gPOST('%s/login.cgi' %(self.url), 'username=%s&password=%s' %(self.user, self.passwd), c, json=False, debug=False)
+        except requests.exceptions.Timeout:
+            self.status = 'Not responding'
+            return False
+        except requests.exceptions.ConnectionError:
+            self.status = 'Timeout'
+            return False
+        except:
+            self.status = 'Unkown error'
+            return False
         if r:
             self.cookie = c
+            self.status = 'OK'
             return True
         return False
 
@@ -81,7 +96,9 @@ class mFiPowerDevice:
             if not force:
                 return True
         if not self.cookie:
-            self.login()
+            s = self.login()
+            if not s:
+                return False
         r = gGET('%s/sensors' %(self.url), self.cookie)
         if r and 'success' in r['status']:
             self.sensors = r['sensors']
